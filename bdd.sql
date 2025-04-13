@@ -23,11 +23,12 @@ CREATE TABLE IF NOT EXISTS session(
     date_start DATE NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS position(
-    driver_number INT PRIMARY KEY,
-    session_key INT NOT NULL,
-    position INT NOT NULL,
-    date DATETIME NOT NULL
+CREATE TABLE position (
+    driver_number INT,
+    session_key INT,
+    position INT,
+    date TEXT,
+    PRIMARY KEY (driver_number, session_key, date)
 );
 
 CREATE TABLE IF NOT EXISTS lap(

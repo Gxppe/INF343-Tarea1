@@ -91,13 +91,15 @@ func main() {
     }
 
     for sessionKey, drivers := range sessionDrivers {
+		// Obtener todos los drivers de la API
+		fmt.Println("Obteniendo drivers de la API...")
         todos, err := obtenerJSON[entidades.Driver](
             fmt.Sprintf("https://api.openf1.org/v1/drivers?session_key=%d", sessionKey))
         if err != nil {
             log.Println("Error al obtener drivers:", err)
             continue
         }
-
+		fmt.Println("✓ Drivers obtenidos de la API, total:", len(todos))
         // Crear un set de drivers válidos
         valid := map[int]bool{}
         for _, num := range drivers {
@@ -106,6 +108,7 @@ func main() {
 
         for _, d := range todos {
             if valid[d.DriverNumber] {
+				fmt.Println("Insertando driver:", d.DriverNumber, d.FirstName, d.LastName)
                 if err := insertarDriver(db, d); err != nil {
                     log.Println("Error insertando driver:", err)
                 }
@@ -114,12 +117,15 @@ func main() {
     }
 
     // 🔹 Rellenar tabla de carreras
+	fmt.Println("Obteniendo sesiones de la API...")
     sesiones, err := obtenerJSON[entidades.Session](
         "https://api.openf1.org/v1/sessions?session_name=Race&year=2024")
     if err != nil {
         log.Fatal("Error obteniendo sesiones:", err)
     }
+	fmt.Println("✓ Sesiones obtenidas de la API, total:", len(sesiones))
     for _, s := range sesiones {
+		fmt.Println("Insertando sesión:", s.SessionKey, s.SessionName)
         _, err := db.Exec(`
             INSERT OR IGNORE INTO session (
                 session_key, session_name, session_type, location,
@@ -147,13 +153,16 @@ func main() {
 
     // 🔹 Rellenar tabla de posiciones
     for _, key := range claves {
+		fmt.Println("Obteniendo posiciones de la API para session_key:", key)
         posiciones, err := obtenerJSON[entidades.Position](
             fmt.Sprintf("https://api.openf1.org/v1/position?session_key=%d", key))
         if err != nil {
             log.Println("Error posiciones:", err)
             continue
         }
+		fmt.Println("✓ Posiciones obtenidas de la API, total:", len(posiciones))
         for _, p := range posiciones {
+			fmt.Println("Insertando posición:", p.DriverNumber, p.SessionKey, p.Position)
             _, err := db.Exec(`
                 INSERT OR IGNORE INTO position (driver_number, session_key, position, date)
                 VALUES (?, ?, ?, ?)`,
@@ -166,13 +175,14 @@ func main() {
 
     // 🔹 Rellenar tabla de vueltas (laps)
     for _, key := range claves {
+		fmt.Println("Obteniendo vueltas de la API para session_key:", key)
         vueltas, err := obtenerJSON[entidades.Lap](
             fmt.Sprintf("https://api.openf1.org/v1/laps?session_key=%d", key))
         if err != nil {
             log.Println("Error vueltas:", err)
             continue
         }
-
+		fmt.Println("✓ Vueltas obtenidas de la API, total:", len(vueltas))
         for _, l := range vueltas {
 			_, err := db.Exec(`
 				INSERT OR IGNORE INTO lap (
