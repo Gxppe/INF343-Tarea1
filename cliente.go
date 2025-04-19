@@ -5,16 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
 	//"os"
 	"io"
 	"log"
-
 	//"sort"
-
 	_ "github.com/mattn/go-sqlite3"
 	//"github.com/gin-gonic/gin"
 	"github.com/INF343-Tarea1/entidades"
+	"github.com/INF343-Tarea1/vista"
 )
 
 func conectarBD() (*sql.DB, error) {
@@ -77,7 +75,7 @@ func insertarLap(db *sql.DB, l entidades.Lap) error {
 	return err
 }
 
-func main() {
+func rellenarBD() {
 	db, err := conectarBD()
 	if err != nil {
 		log.Fatal("Error conectando a la base de datos:", err)
@@ -200,4 +198,39 @@ func main() {
 	}
 
 	fmt.Println("✓ Base de datos rellenada correctamente.")
+}
+
+func main(){
+	rellenarBD()
+
+	for {
+		fmt.Println("\n Menu")
+		fmt.Println("1. Ver corredores")
+		fmt.Println("2. Ver detalle de corredor")
+		fmt.Println("3. Ver carreras")
+		fmt.Println("4. Ver detalle de carrera")
+		fmt.Println("5. Resumen de temporada")
+		fmt.Println("6. Salir")
+		fmt.Println("Seleccione una opción:")
+		var opcion int
+		fmt.Scanln(&opcion)
+
+		switch opcion {
+		case 1:
+			vista.VerCorredores()
+		case 2:
+			vista.VerDetalleCorredor()
+		case 3:
+			vista.VerCarreras()
+		case 4:
+			vista.VerDetalleCarrera()
+		case 5:
+			vista.ResumenTemporada()
+		case 6:
+			fmt.Println("Saliendo...")
+			return
+		default:
+			fmt.Println("Opción no válida. Intente nuevamente.")
+		}
+	}
 }

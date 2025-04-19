@@ -104,7 +104,7 @@ func main() {
 		}
 		c.JSON(200, races)
 	})
-
+	// Endpoint para obtener detalles de una carrera específica
 	r.GET("/api/carrera/detalle/:id", func(c *gin.Context) {
 		raceID, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
