@@ -122,6 +122,22 @@ func main() {
 		c.JSON(http.StatusOK, raceDetails)
 	})
 
+	// Endpoint para obtener resumen
+	r.GET("/api/temporada/resumen", func(c *gin.Context) {
+		log.Println("Obteniendo resumen de temporada...")
+		summary, err := handler.GetSeasonSummary(db)
+		if err != nil {
+			log.Printf("Error obteniendo resumen de temporada: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "internal_server_error",
+				"message": "Error al obtener el resumen de temporada",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, summary)
+	})
+
 	// Iniciar el servidor en el puerto 8080
 	r.Run(":8080")
 }
