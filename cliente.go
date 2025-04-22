@@ -116,7 +116,6 @@ func rellenarBD() {
 	}
 	fmt.Println("✓ Sesiones obtenidas de la API, total:", len(sesiones))
 	for _, s := range sesiones {
-		fmt.Println("Insertando sesión:", s.SessionKey, s.SessionName)
 		_, err := db.Exec(`
             INSERT OR IGNORE INTO session (
                 session_key, session_name, session_type, location,
@@ -210,7 +209,7 @@ func rellenarBD() {
 }
 
 func main(){
-	rellenarBD()
+	//rellenarBD()
 	for {
 		fmt.Println("\n Menu")
 		fmt.Println("1. Ver corredores")

@@ -64,8 +64,8 @@ func VerDetalleCorredor() {
 		log.Fatal("Error al deserializar respuesta:", err)
 	}
 
-	// Primero revisar si el corredpr existe
-	if detalle["driver_number"] == nil {
+	// Primero revisar si el corredor existe
+	if detalle["driver_id"] == nil {
 		fmt.Println("El piloto no existe")
 		return
 	}
@@ -146,7 +146,7 @@ func VerDetalleCarrera() {
 	}
 
 	// Primero revisar si la carrera existe
-	if detalle["session_key"] == nil {
+	if detalle["race_id"] == nil {
 		fmt.Println("La carrera no existe")
 		return
 	}
