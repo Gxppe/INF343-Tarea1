@@ -160,6 +160,9 @@ func rellenarBD() {
 		}
 		fmt.Println("✓ Posiciones obtenidas de la API, total:", len(posiciones))
 		for _, p := range posiciones {
+			if p.DriverNumber == 61 {
+				continue
+			}
 			fmt.Println("Insertando posición:", p.DriverNumber, p.SessionKey, p.Position)
 			_, err := db.Exec(`
                 INSERT OR IGNORE INTO position (driver_number, session_key, position, date)
@@ -182,6 +185,24 @@ func rellenarBD() {
 		}
 		fmt.Println("✓ Vueltas obtenidas de la API, total:", len(vueltas))
 		for _, l := range vueltas {
+			if l.DriverNumber == 61 {
+				continue
+			}
+			if l.LapDuration == 0 {
+				l.LapDuration = 9999
+			}
+			if l.DurationSector1 == 0 {
+				l.DurationSector1 = 9999
+			}
+			if l.DurationSector2 == 0 {
+				l.DurationSector2 = 9999
+			}
+			if l.DurationSector3 == 0 {
+				l.DurationSector3 = 9999
+			}
+			if l.StSpeed == 0 {
+				l.StSpeed = 9999
+			}
 			_, err := db.Exec(`
 				INSERT OR IGNORE INTO lap (
 					driver_number, session_key, lap_number, lap_duration,
