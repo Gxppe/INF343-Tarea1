@@ -71,6 +71,13 @@ func insertarLap(db *sql.DB, l entidades.Lap) error {
 	return err
 }
 
+func check(num float64) float64 {
+	if num == 0 {
+		return 9999
+	}
+	return num
+}
+
 func rellenarBD() {
 	db, err := conectarBD()
 	if err != nil {
@@ -175,21 +182,14 @@ func rellenarBD() {
 			if l.DriverNumber == 61 {
 				continue
 			}
-			if l.LapDuration == 0 {
-				l.LapDuration = 9999
-			}
-			if l.DurationSector1 == 0 {
-				l.DurationSector1 = 9999
-			}
-			if l.DurationSector2 == 0 {
-				l.DurationSector2 = 9999
-			}
-			if l.DurationSector3 == 0 {
-				l.DurationSector3 = 9999
-			}
-			if l.StSpeed == 0 {
-				l.StSpeed = 9999
-			}
+			// Revisar si hay valores nulos
+			check(float64(l.LapNumber))
+			check(l.LapDuration)
+			check(l.DurationSector1)
+			check(l.DurationSector2)
+			check(l.DurationSector3)
+			check(l.StSpeed)
+
 			_, err := db.Exec(`
 				INSERT OR IGNORE INTO lap (
 					driver_number, session_key, lap_number, lap_duration,
