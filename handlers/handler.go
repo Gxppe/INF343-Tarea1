@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -327,18 +329,17 @@ func GetRaceDetails(db *sql.DB, raceID int) (map[string]interface{}, error) {
 	// 2. Obtener primeros 3 puestos
 	top3Query := `
         SELECT 
-		p.position,
-		d.first_name || ' ' || d.last_name as driver_name,
-		d.team_name,
-		d.country_code
+			p.position,
+			d.first_name || ' ' || d.last_name as driver_name,
+			d.team_name,
+			d.country_code
 		FROM position p
 		JOIN driver d ON p.driver_number = d.driver_number
 		WHERE p.session_key = ? AND p.position <= 3
 		GROUP BY p.position, p.driver_number
 		ORDER BY p.position ASC
 		LIMIT 3;
-`
-
+    `
 	rows, err := db.Query(top3Query, raceID)
 	if err != nil {
 		return nil, fmt.Errorf("error obteniendo top 3: %v", err)
@@ -346,9 +347,8 @@ func GetRaceDetails(db *sql.DB, raceID int) (map[string]interface{}, error) {
 	defer rows.Close()
 
 	var results []map[string]interface{}
-	seenDrivers := make(map[string]bool) // To track seen drivers and avoid duplicates
+	seenDrivers := make(map[string]bool)
 
-	// Process the top 3 results
 	for rows.Next() {
 		var (
 			position   int
@@ -356,21 +356,17 @@ func GetRaceDetails(db *sql.DB, raceID int) (map[string]interface{}, error) {
 			teamName   string
 			country    string
 		)
-
-		err := rows.Scan(&position, &driverName, &teamName, &country)
-		if err != nil {
+		if err := rows.Scan(&position, &driverName, &teamName, &country); err != nil {
 			log.Printf("Error scanning top 3 result: %v", err)
 			continue
 		}
-
-		if !seenDrivers[driverName] { // Add only if the driver has not been seen before
-			result := map[string]interface{}{
+		if !seenDrivers[driverName] {
+			results = append(results, map[string]interface{}{
 				"position": position,
 				"driver":   driverName,
 				"team":     teamName,
 				"country":  country,
-			}
-			results = append(results, result)
+			})
 			seenDrivers[driverName] = true
 		}
 	}
@@ -387,22 +383,18 @@ func GetRaceDetails(db *sql.DB, raceID int) (map[string]interface{}, error) {
         WHERE p.session_key = ?
         ORDER BY p.position DESC
         LIMIT 1`
-
 	var (
 		lastPos     int
 		lastDriver  string
 		lastTeam    string
 		lastCountry string
 	)
-
 	err = db.QueryRow(lastQuery, raceID).Scan(
 		&lastPos, &lastDriver, &lastTeam, &lastCountry,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error obteniendo último puesto: %v", err)
 	}
-
-	// Agregar último puesto con posición "Ultimo"
 	if !seenDrivers[lastDriver] {
 		results = append(results, map[string]interface{}{
 			"position": "Ultimo",
@@ -424,58 +416,95 @@ func GetRaceDetails(db *sql.DB, raceID int) (map[string]interface{}, error) {
         GROUP BY l.driver_number
         ORDER BY max_speed DESC
         LIMIT 1`
-
 	var (
 		speedDriver string
 		maxSpeed    float64
 	)
-
 	err = db.QueryRow(maxSpeedQuery, raceID).Scan(&speedDriver, &maxSpeed)
-
+	if err != nil {
+		return nil, fmt.Errorf("error obteniendo velocidad máxima: %v", err)
+	}
 	maxSpeedData := map[string]interface{}{
 		"driver":    speedDriver,
 		"speed_kmh": maxSpeed,
 	}
 
-	// 5. Obtener la vuelta más rápida
+	// 5. Obtener la vuelta más rápida (parseando strings de duración)
 	fastestLapQuery := `
         SELECT 
             d.first_name || ' ' || d.last_name as driver_name,
-            l.lap_duration as total_time,
-            l.duration_sector_1 as sector_1,
-            l.duration_sector_2 as sector_2,
-            l.duration_sector_3 as sector_3
+            l.lap_duration as raw_total,
+            l.duration_sector_1 as raw_s1,
+            l.duration_sector_2 as raw_s2,
+            l.duration_sector_3 as raw_s3
         FROM lap l
         JOIN driver d ON l.driver_number = d.driver_number
         WHERE l.session_key = ?
-        AND l.lap_duration = (SELECT MIN(l2.lap_duration) FROM lap l2 WHERE l2.session_key = ?)
-        LIMIT 1`
-
+          AND l.lap_duration = (
+              SELECT MIN(l2.lap_duration) 
+              FROM lap l2 
+              WHERE l2.session_key = ?
+          )
+        LIMIT 1;`
 	var (
-		fastDriver string
-		totalTime  float64
-		sector1    float64
-		sector2    float64
-		sector3    float64
+		fastDriver      string
+		rawTotal, rawS1 string
+		rawS2, rawS3    string
 	)
-
 	err = db.QueryRow(fastestLapQuery, raceID, raceID).Scan(
-		&fastDriver, &totalTime, &sector1, &sector2, &sector3,
+		&fastDriver, &rawTotal, &rawS1, &rawS2, &rawS3,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("error obteniendo vuelta más rápida: %v", err)
+	}
+
+	// helper: "MM:SS.SSSSSS" → segundos float64
+	parseDur := func(raw string) (float64, error) {
+		parts := strings.Split(raw, ":")
+		if len(parts) != 2 {
+			return 0, fmt.Errorf("formato inválido: %s", raw)
+		}
+		min, err := strconv.ParseFloat(parts[0], 64)
+		if err != nil {
+			return 0, err
+		}
+		sec, err := strconv.ParseFloat(parts[1], 64)
+		if err != nil {
+			return 0, err
+		}
+		return min*60 + sec, nil
+	}
+
+	totalSecs, err := parseDur(rawTotal)
+	if err != nil {
+		return nil, fmt.Errorf("parseDur total: %v", err)
+	}
+	s1, err := parseDur(rawS1)
+	if err != nil {
+		return nil, fmt.Errorf("parseDur s1: %v", err)
+	}
+	s2, err := parseDur(rawS2)
+	if err != nil {
+		return nil, fmt.Errorf("parseDur s2: %v", err)
+	}
+	s3, err := parseDur(rawS3)
+	if err != nil {
+		return nil, fmt.Errorf("parseDur s3: %v", err)
+	}
 
 	fastestLap := map[string]interface{}{
 		"driver":     fastDriver,
-		"total_time": totalTime,
-		"sector_1":   sector1,
-		"sector_2":   sector2,
-		"sector_3":   sector3,
+		"total_time": totalSecs,
+		"sector_1":   s1,
+		"sector_2":   s2,
+		"sector_3":   s3,
 	}
 
-	// 6. Construir respuesta final en el formato requerido
+	// 6. Construir respuesta final
 	response := map[string]interface{}{
 		"race_id":            sessionKey,
 		"country_name":       countryName,
-		"date_start":         dateStart.Format("2006-01-02T15:04:05-07:00"), // Formato ISO 8601
+		"date_start":         dateStart.Format(time.RFC3339Nano),
 		"year":               year,
 		"circuit_short_name": circuitName,
 		"results":            results,
@@ -484,4 +513,163 @@ func GetRaceDetails(db *sql.DB, raceID int) (map[string]interface{}, error) {
 	}
 
 	return response, nil
+}
+
+//TODO: ARREGLAR LOS "POLE" Y QUE NO CONSIDERE TODOS LOS AÑOS
+
+func GetSeasonSummary(db *sql.DB) (map[string]interface{}, error) {
+	season := 2024
+
+	// 1) Top 3 winners
+	winnersQ := `
+WITH LatestVictories AS (
+    SELECT 
+        p.driver_number,
+        p.session_key,
+        p.position,
+        p.date,
+        ROW_NUMBER() OVER (PARTITION BY p.session_key ORDER BY p.date DESC) AS rn
+    FROM position p
+    WHERE p.position = 1
+)
+SELECT 
+    d.first_name || ' ' || d.last_name AS driver,
+    d.team_name AS team,
+    d.country_code AS country,
+    COUNT(lv.session_key) AS wins
+FROM LatestVictories lv
+JOIN driver d ON lv.driver_number = d.driver_number
+WHERE lv.rn = 1  -- Solo seleccionamos la carrera con la fecha más alta (última)
+GROUP BY lv.driver_number
+ORDER BY wins DESC
+LIMIT 3
+    `
+	rows, err := db.Query(winnersQ, season)
+	if err != nil {
+		return nil, fmt.Errorf("query winners: %v", err)
+	}
+	defer rows.Close()
+
+	topWinners := make([]map[string]interface{}, 0, 3)
+	pos := 1
+	for rows.Next() {
+		var driver, team, country string
+		var wins int
+		if err := rows.Scan(&driver, &team, &country, &wins); err != nil {
+			return nil, fmt.Errorf("scan winners: %v", err)
+		}
+		topWinners = append(topWinners, map[string]interface{}{
+			"position": pos,
+			"driver":   driver,
+			"team":     team,
+			"country":  country,
+			"wins":     wins,
+		})
+		pos++
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// 2) Top 3 fastest laps
+	fastestQ := `
+        SELECT 
+            d.first_name || ' ' || d.last_name AS driver,
+            d.team_name AS team,
+            d.country_code AS country,
+            COUNT(l.driver_number) AS fastest_laps
+        FROM lap l
+        JOIN session s ON l.session_key = s.session_key
+        JOIN driver d ON l.driver_number = d.driver_number
+        WHERE s.year = ?
+        GROUP BY l.driver_number
+        ORDER BY fastest_laps DESC
+        LIMIT 3
+    `
+	rowsF, err := db.Query(fastestQ, season)
+	if err != nil {
+		return nil, fmt.Errorf("query fastest laps: %v", err)
+	}
+	defer rowsF.Close()
+
+	topFastest := make([]map[string]interface{}, 0, 3)
+	pos = 1
+	for rowsF.Next() {
+		var driver, team, country string
+		var flaps int
+		if err := rowsF.Scan(&driver, &team, &country, &flaps); err != nil {
+			return nil, fmt.Errorf("scan fastest laps: %v", err)
+		}
+		topFastest = append(topFastest, map[string]interface{}{
+			"position":     pos,
+			"driver":       driver,
+			"team":         team,
+			"country":      country,
+			"fastest_laps": flaps,
+		})
+		pos++
+	}
+	if err := rowsF.Err(); err != nil {
+		return nil, err
+	}
+
+	// 3) Top 3 pole positions (basado en el mejor tiempo en la vuelta 1)
+	poleQ := `
+WITH LatestVictories AS (
+    SELECT 
+        p.driver_number,
+        p.session_key,
+        p.position,
+        p.date,
+        ROW_NUMBER() OVER (PARTITION BY p.session_key ORDER BY p.date ASC) AS rn  -- Ordenar por fecha más baja
+    FROM position p
+    WHERE p.position = 1
+)
+SELECT 
+    d.first_name || ' ' || d.last_name AS driver,
+    d.team_name AS team,
+    d.country_code AS country,
+    COUNT(lv.session_key) AS wins
+FROM LatestVictories lv
+JOIN driver d ON lv.driver_number = d.driver_number
+WHERE lv.rn = 1  -- Solo seleccionamos la carrera con la fecha más baja
+GROUP BY lv.driver_number
+ORDER BY wins DESC
+LIMIT 3
+
+    `
+	rowsP, err := db.Query(poleQ, season)
+	if err != nil {
+		return nil, fmt.Errorf("query poles: %v", err)
+	}
+	defer rowsP.Close()
+
+	topPoles := make([]map[string]interface{}, 0, 3)
+	pos = 1
+	for rowsP.Next() {
+		var driver, team, country string
+		var poles int
+		if err := rowsP.Scan(&driver, &team, &country, &poles); err != nil {
+			return nil, fmt.Errorf("scan poles: %v", err)
+		}
+		topPoles = append(topPoles, map[string]interface{}{
+			"position": pos,
+			"driver":   driver,
+			"team":     team,
+			"country":  country,
+			"poles":    poles,
+		})
+		pos++
+	}
+	if err := rowsP.Err(); err != nil {
+		return nil, err
+	}
+
+	// Armar JSON
+	return map[string]interface{}{
+		"season":               season,
+		"top_3_winners":        topWinners,
+		"top_3_fastest_laps":   topFastest,
+		"top_3_pole_positions": topPoles,
+	}, nil
 }
