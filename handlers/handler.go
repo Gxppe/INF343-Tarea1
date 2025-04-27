@@ -460,20 +460,31 @@ func GetRaceDetails(db *sql.DB, raceID int) (map[string]interface{}, error) {
 
 	// helper: "MM:SS.SSSSSS" → segundos float64
 	parseDur := func(raw string) (float64, error) {
-		parts := strings.Split(raw, ":")
-		if len(parts) != 2 {
-			return 0, fmt.Errorf("formato inválido: %s", raw)
+		if strings.Contains(raw, ":") {
+			// Caso formato MM:SS.SSS
+			parts := strings.Split(raw, ":")
+			if len(parts) != 2 {
+				return 0, fmt.Errorf("formato inválido: %s", raw)
+			}
+			min, err := strconv.ParseFloat(parts[0], 64)
+			if err != nil {
+				return 0, err
+			}
+			sec, err := strconv.ParseFloat(parts[1], 64)
+			if err != nil {
+				return 0, err
+			}
+			return min*60 + sec, nil
+		} else {
+			// Caso sólo segundos
+			sec, err := strconv.ParseFloat(raw, 64)
+			if err != nil {
+				return 0, err
+			}
+			return sec, nil
 		}
-		min, err := strconv.ParseFloat(parts[0], 64)
-		if err != nil {
-			return 0, err
-		}
-		sec, err := strconv.ParseFloat(parts[1], 64)
-		if err != nil {
-			return 0, err
-		}
-		return min*60 + sec, nil
 	}
+	
 
 	totalSecs, err := parseDur(rawTotal)
 	if err != nil {

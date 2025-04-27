@@ -71,9 +71,9 @@ func insertarLap(db *sql.DB, l entidades.Lap) error {
 	return err
 }
 
-func check(num float64) float64 {
+func check(num float64) interface{} {
 	if num == 0 {
-		return 9999
+		return nil
 	}
 	return num
 }
@@ -196,9 +196,15 @@ func rellenarBD() {
 					duration_sector_1, duration_sector_2, duration_sector_3,
 					st_speed, date_start
 				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				l.DriverNumber, l.SessionKey, l.LapNumber, l.LapDuration,
-				l.DurationSector1, l.DurationSector2, l.DurationSector3,
-				l.StSpeed, l.DateStart)
+				l.DriverNumber,
+				l.SessionKey,
+				l.LapNumber,
+				check(l.LapDuration),
+				check(l.DurationSector1),
+				check(l.DurationSector2),
+				check(l.DurationSector3),
+				check(l.StSpeed),
+				l.DateStart)
 			if err != nil {
 				log.Println("Error insertando vuelta:", err)
 			}
@@ -209,7 +215,7 @@ func rellenarBD() {
 }
 
 func main(){
-	//rellenarBD()
+	rellenarBD()
 	for {
 		fmt.Println("\n Menu")
 		fmt.Println("1. Ver corredores")

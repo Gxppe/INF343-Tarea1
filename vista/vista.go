@@ -24,11 +24,11 @@ func VerCorredores() {
 	if err := json.Unmarshal(body, &corredores); err != nil {
 		log.Fatal("Error al deserializar respuesta:", err)
 	}
-	fmt.Println("-------------------------------------------------------------")
-	fmt.Println("| # | Nombre | Apellido | N Piloto | Equipo | Pais |")
-	fmt.Println("-------------------------------------------------------------")
+	fmt.Println("---------------------------------------------------------------------------")
+	fmt.Println("| #  | Nombre        | Apellido      | N Piloto | Equipo           | Pais |")
+	fmt.Println("---------------------------------------------------------------------------")
 	for i, corredor := range corredores {
-		fmt.Printf("| %d | %s | %s | %d | %s | %s |\n",
+		fmt.Printf("| %-2d | %-13s | %-13s | %-8d | %-16s | %-4s |\n",
 			i+1,
 			corredor["first_name"],
 			corredor["last_name"],
@@ -37,7 +37,8 @@ func VerCorredores() {
 			corredor["country_code"],
 		)
 	}
-	fmt.Println("-------------------------------------------------------------")
+	fmt.Println("---------------------------------------------------------------------------")
+	
 }
 
 func boolAfirmativo(v interface{}) string {
@@ -70,22 +71,22 @@ func VerDetalleCorredor() {
 		return
 	}
 
-	fmt.Println("-------------------------------------------------------------------------------------------")
-	fmt.Println("| #  | Carrera   | Pos Final   | Vuelta rapida | Velocidad max | Menor tiempo vuelta |")
-	fmt.Println("-------------------------------------------------------------------------------------------")
+	fmt.Println("-----------------------------------------------------------------------------------------------")
+	fmt.Println("| #  | Carrera | Pos Final | Vuelta rápida | Velocidad max | Menor tiempo vuelta |")
+	fmt.Println("-----------------------------------------------------------------------------------------------")
 	for i, c := range detalle["race_results"].([]interface{}) {
 		carrera := c.(map[string]interface{})
-		fmt.Printf("| %2d | %-15s | %-9.0f | %-13s | %-13.0f | %-19.3f |\n",
+		fmt.Printf("| %-2d | %-7s | %-9.0f | %-13s | %-13.0f | %-20.3f |\n",
 			i+1,
-			carrera["race"],               // string
-			carrera["position"].(float64), // float64
-			boolAfirmativo(carrera["fastest_lap"]),
+			carrera["race"].(string),             // string
+			carrera["position"].(float64),         // float64
+			boolAfirmativo(carrera["fastest_lap"]), // string ("Sí"/"No")
 			carrera["max_speed"].(float64),         // float64
 			carrera["best_lap_duration"].(float64), // float64
 		)
 	}
+	fmt.Println("-----------------------------------------------------------------------------------------------")	
 	// FALTA LO DE EL RESUMEN QUE ESTÁ EN HANDLER PERO NO SE LLAMA A GETPERFORMANCESTATS !!!!
-
 }
 
 func formatearFecha(iso string) string {
@@ -110,12 +111,13 @@ func VerCarreras() {
 	if err := json.Unmarshal(body, &carreras); err != nil {
 		log.Fatal("Error al deserializar respuesta:", err)
 	}
-	fmt.Println("| #  | ID carrera | País           | Fecha       | Año   | Circuito        |")
-	fmt.Println("----------------------------------------------------------------------------")
-
+	fmt.Println("-----------------------------------------------------------------------------------------")
+	fmt.Println("| #  | ID carrera | País           | Fecha       | Año  | Circuito           |")
+	fmt.Println("-----------------------------------------------------------------------------------------")
+	
 	for i, c := range carreras {
 		fecha := formatearFecha(c["date_start"].(string))
-		fmt.Printf("| %-2d | %-10v | %-20v | %-10s | %-5v | %-20v |\n",
+		fmt.Printf("| %-2d | %-10v | %-14v | %-10s | %-4v | %-18v |\n",
 			i+1,
 			c["session_key"],
 			c["country_name"],
@@ -124,7 +126,8 @@ func VerCarreras() {
 			c["circuit_short_name"],
 		)
 	}
-	fmt.Println("----------------------------------------------------------------------------")
+	fmt.Println("-----------------------------------------------------------------------------------------")
+	
 
 }
 
@@ -138,6 +141,11 @@ func VerDetalleCarrera() {
 		log.Fatal("Error al obtener detalles de la carrera:", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Error:", resp.Status)
+		return
+	}
 
 	var detalle map[string]interface{}
 	body, _ := io.ReadAll(resp.Body)
@@ -178,7 +186,6 @@ func VerDetalleCarrera() {
 }
 
 func ResumenTemporada() {
-	// FALTA ESTE TMB !!!!
 	resp, err := http.Get("http://localhost:8080/api/temporada/resumen/")
 	if err != nil {
 		log.Fatal("Error al obtener el resumen de temporada:", err)
@@ -200,7 +207,6 @@ func ResumenTemporada() {
 		log.Fatal("Error al deserializar resumen:", err)
 	}
 
-	// 🏆 TOP 3 GANADORES
 	fmt.Println("-------------------------------------------------------------")
 	fmt.Println("\n Top 3 Pilotos con más Victorias - Temporada 2024")
 	fmt.Println("-------------------------------------------------------------")
@@ -213,7 +219,6 @@ func ResumenTemporada() {
 	}
 	fmt.Println("-------------------------------------------------------------")
 
-	// ⏱️ TOP 3 VUELTAS RÁPIDAS
 	fmt.Println("-------------------------------------------------------------")
 	fmt.Println("\n Top 3 Pilotos con más Vueltas Rápidas - Temporada 2024")
 	fmt.Println("-------------------------------------------------------------")
@@ -226,7 +231,6 @@ func ResumenTemporada() {
 	}
 	fmt.Println("-------------------------------------------------------------")
 
-	// 🚦 TOP 3 POLES
 	fmt.Println("-------------------------------------------------------------")
 	fmt.Println("\n Top 3 Pilotos con más Pole Positions - Temporada 2024")
 	fmt.Println("-------------------------------------------------------------")
