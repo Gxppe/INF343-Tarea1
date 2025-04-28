@@ -381,17 +381,26 @@ func GetRaceDetails(db *sql.DB, raceID int) (map[string]interface{}, error) {
 
 	// 2. Obtener primeros 3 puestos
 	top3Query := `
-        SELECT 
+	WITH FinalPositions AS (
+		SELECT 
+			p.driver_number,
 			p.position,
-			d.first_name || ' ' || d.last_name as driver_name,
-			d.team_name,
-			d.country_code
+			p.date,
+			ROW_NUMBER() OVER (PARTITION BY p.driver_number ORDER BY p.date DESC) as pos_rank
 		FROM position p
-		JOIN driver d ON p.driver_number = d.driver_number
-		WHERE p.session_key = ? AND p.position <= 3
-		GROUP BY p.position, p.driver_number
-		ORDER BY p.position ASC
-		LIMIT 3;
+		WHERE p.session_key = ?
+	)
+	SELECT 
+		fp.position,
+		d.first_name || ' ' || d.last_name as driver_name,
+		d.team_name,
+		d.country_code
+	FROM FinalPositions fp
+	JOIN driver d ON fp.driver_number = d.driver_number
+	WHERE fp.pos_rank = 1  -- Solo la última posición registrada de cada piloto
+	AND fp.position <= 3   -- Solo posiciones del podio (1°, 2°, 3°)
+	ORDER BY fp.position ASC
+	LIMIT 3;
     `
 	rows, err := db.Query(top3Query, raceID)
 	if err != nil {
@@ -425,24 +434,22 @@ func GetRaceDetails(db *sql.DB, raceID int) (map[string]interface{}, error) {
 	}
 
 	// 3. Obtener último puesto
-	lastQuery := `
-        SELECT 
-            p.position,
-            d.first_name || ' ' || d.last_name as driver_name,
-            d.team_name,
-            d.country_code
-        FROM position p
-        JOIN driver d ON p.driver_number = d.driver_number
-        WHERE p.session_key = ?
-        ORDER BY p.position DESC
-        LIMIT 1`
+	lastQuery := `SELECT p.position, d.first_name, d.last_name
+FROM position p
+JOIN driver d ON p.driver_number = d.driver_number
+WHERE p.session_key = ?
+AND p.position = (
+    SELECT MAX(position) 
+    FROM position 
+    WHERE session_key = ?
+);`
 	var (
 		lastPos     int
 		lastDriver  string
 		lastTeam    string
 		lastCountry string
 	)
-	err = db.QueryRow(lastQuery, raceID).Scan(
+	err = db.QueryRow(lastQuery, raceID, raceID).Scan(
 		&lastPos, &lastDriver, &lastTeam, &lastCountry,
 	)
 	if err != nil {
