@@ -230,42 +230,52 @@ GROUP BY d.driver_number, d.first_name, d.last_name, d.team_name, d.country_code
 
 func getRaceResults(db *sql.DB, driverID int) ([]map[string]interface{}, error) {
 	query := `
-        SELECT 
-            p.session_key,
-            s.circuit_short_name,
-            s.session_name,
-            p.position,
-            (
-                SELECT CAST(l.lap_duration AS REAL)
-                FROM lap l 
-                WHERE l.session_key = p.session_key 
-                AND l.driver_number = p.driver_number
-                ORDER BY l.lap_duration ASC
-                LIMIT 1
-            ) as best_lap_duration,
-            (
-                SELECT MAX(l.st_speed) 
-                FROM lap l 
-                WHERE l.session_key = p.session_key 
-                AND l.driver_number = p.driver_number
-            ) as max_speed,
-            EXISTS(
-                SELECT 1 
-                FROM lap l 
-                WHERE l.session_key = p.session_key 
-                AND l.driver_number = p.driver_number
-                AND l.lap_duration = (
-                    SELECT MIN(l2.lap_duration) 
-                    FROM lap l2 
-                    WHERE l2.session_key = p.session_key
-                )
-            ) as fastest_lap
-        FROM position p
-        JOIN session s ON p.session_key = s.session_key
-        WHERE p.driver_number = ? 
-        AND s.session_type = 'Race'
-        GROUP BY p.session_key, s.circuit_short_name, s.session_name, p.position
-        ORDER BY p.session_key DESC`
+WITH FinalRacePositions AS (
+    SELECT 
+        p.driver_number,
+        p.session_key,
+        p.position,
+        p.date,
+        ROW_NUMBER() OVER (PARTITION BY p.session_key, p.driver_number ORDER BY p.date DESC) as pos_rank
+    FROM position p
+    JOIN session s ON p.session_key = s.session_key
+    WHERE p.driver_number = ?
+    AND s.session_type = 'Race'
+)
+SELECT 
+    frp.session_key,
+    s.circuit_short_name,
+    s.session_name,
+    frp.position as final_position,
+    (
+        SELECT CAST(l.lap_duration AS REAL)
+        FROM lap l 
+        WHERE l.session_key = frp.session_key 
+        AND l.driver_number = frp.driver_number
+        ORDER BY l.lap_duration ASC
+        LIMIT 1
+    ) as best_lap_duration,
+    (
+        SELECT MAX(l.st_speed) 
+        FROM lap l 
+        WHERE l.session_key = frp.session_key 
+        AND l.driver_number = frp.driver_number
+    ) as max_speed,
+    EXISTS(
+        SELECT 1 
+        FROM lap l 
+        WHERE l.session_key = frp.session_key 
+        AND l.driver_number = frp.driver_number
+        AND l.lap_duration = (
+            SELECT MIN(l2.lap_duration) 
+            FROM lap l2 
+            WHERE l2.session_key = frp.session_key
+        )
+    ) as had_fastest_lap
+FROM FinalRacePositions frp
+JOIN session s ON frp.session_key = s.session_key
+WHERE frp.pos_rank = 1  -- Solo la última posición registrada en cada carrera
+ORDER BY frp.session_key DESC;`
 
 	rows, err := db.Query(query, driverID)
 	if err != nil {
