@@ -164,10 +164,51 @@ func getPerformanceStats(db *sql.DB, driverID int) (map[string]interface{}, erro
 
 	// Calcular victorias y podios
 	err := db.QueryRow(`
-		SELECT 
-			COUNT(CASE WHEN position = 1 THEN 1 END),
-			COUNT(CASE WHEN position <= 3 THEN 1 END)
-		FROM position WHERE driver_number = ?`, driverID).Scan(&wins, &podiums)
+		WITH LatestVictories AS (
+    SELECT 
+        p.driver_number,
+        p.session_key,
+        p.position,
+        p.date,
+        ROW_NUMBER() OVER (PARTITION BY p.session_key ORDER BY p.date DESC) AS rn
+    FROM position p
+    WHERE p.position = 1
+),
+DriverLatestPositions AS (
+    SELECT 
+        p.driver_number,
+        p.session_key,
+        p.position,
+        ROW_NUMBER() OVER (PARTITION BY p.driver_number, p.session_key ORDER BY p.date DESC) AS rn
+    FROM position p
+    WHERE p.driver_number = 1  -- Corredor específico
+),
+DriverTop3 AS (
+    SELECT 
+        p.driver_number,
+        COUNT(*) AS top3_count
+    FROM position p
+    WHERE p.driver_number = ?  -- Corredor específico
+    AND p.position <= 3
+    AND (p.driver_number, p.session_key, p.date) IN (
+        SELECT driver_number, session_key, MAX(date)
+        FROM position
+        GROUP BY driver_number, session_key
+    )
+    GROUP BY p.driver_number
+)
+SELECT 
+
+    COUNT(lv.session_key) AS wins,
+    COALESCE(dt.top3_count, 0) AS top3_count
+FROM driver d
+LEFT JOIN LatestVictories lv 
+    ON d.driver_number = lv.driver_number 
+    AND lv.rn = 1
+LEFT JOIN DriverTop3 dt
+    ON d.driver_number = dt.driver_number
+WHERE d.driver_number = 1  -- Mismo corredor que en los CTEs
+GROUP BY d.driver_number, d.first_name, d.last_name, d.team_name, d.country_code, dt.top3_count;`, driverID).Scan(&wins, &podiums)
 	if err != nil {
 		return nil, err
 	}
@@ -295,6 +336,8 @@ func getRaceResults(db *sql.DB, driverID int) ([]map[string]interface{}, error) 
 
 	return results, nil
 }
+
+// TODO:arreglar CONSUMO DE WINS Y mostrar en pantalla las victorias
 func GetRaceDetails(db *sql.DB, raceID int) (map[string]interface{}, error) {
 	// 1. Obtener información básica de la carrera
 	raceQuery := `
@@ -484,7 +527,6 @@ func GetRaceDetails(db *sql.DB, raceID int) (map[string]interface{}, error) {
 			return sec, nil
 		}
 	}
-	
 
 	totalSecs, err := parseDur(rawTotal)
 	if err != nil {
@@ -584,18 +626,34 @@ LIMIT 3
 
 	// 2) Top 3 fastest laps
 	fastestQ := `
-        SELECT 
-            d.first_name || ' ' || d.last_name AS driver,
-            d.team_name AS team,
-            d.country_code AS country,
-            COUNT(l.driver_number) AS fastest_laps
-        FROM lap l
-        JOIN session s ON l.session_key = s.session_key
-        JOIN driver d ON l.driver_number = d.driver_number
-        WHERE s.year = ?
-        GROUP BY l.driver_number
-        ORDER BY fastest_laps DESC
-        LIMIT 3
+WITH FastestLapsPerSession AS (
+    SELECT 
+        l.session_key,
+        l.driver_number,
+        l.lap_number,
+        l.lap_duration,
+        ROW_NUMBER() OVER (PARTITION BY l.session_key ORDER BY l.lap_duration ASC) AS fastest_rank
+    FROM lap l
+    JOIN session s ON l.session_key = s.session_key
+    WHERE s.year = ?
+),
+DriverFastestLaps AS (
+    SELECT 
+        driver_number,
+        COUNT(*) AS fastest_laps
+    FROM FastestLapsPerSession
+    WHERE fastest_rank = 1
+    GROUP BY driver_number
+)
+SELECT 
+    d.first_name || ' ' || d.last_name AS driver,
+    d.team_name AS team,
+    d.country_code AS country,
+    COALESCE(dfl.fastest_laps, 0) AS fastest_laps
+FROM driver d
+LEFT JOIN DriverFastestLaps dfl ON d.driver_number = dfl.driver_number
+ORDER BY fastest_laps DESC
+LIMIT 3;
     `
 	rowsF, err := db.Query(fastestQ, season)
 	if err != nil {
