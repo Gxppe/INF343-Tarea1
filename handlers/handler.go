@@ -434,15 +434,20 @@ func GetRaceDetails(db *sql.DB, raceID int) (map[string]interface{}, error) {
 	}
 
 	// 3. Obtener último puesto
-	lastQuery := `SELECT p.position, d.first_name, d.last_name
+	lastQuery := `SELECT 
+    p.position, 
+    d.first_name || ' ' || d.last_name AS driver_name,
+    d.team_name,
+    d.country_code
 FROM position p
 JOIN driver d ON p.driver_number = d.driver_number
 WHERE p.session_key = ?
-AND p.position = (
-    SELECT MAX(position) 
-    FROM position 
-    WHERE session_key = ?
-);`
+  AND p.position = (
+      SELECT MAX(position) 
+      FROM position 
+      WHERE session_key = ?
+  );
+`
 	var (
 		lastPos     int
 		lastDriver  string
