@@ -215,7 +215,7 @@ func rellenarBD() {
 }
 
 func main(){
-	rellenarBD()
+	//rellenarBD()
 	for {
 		fmt.Println("\n Menu")
 		fmt.Println("1. Ver corredores")

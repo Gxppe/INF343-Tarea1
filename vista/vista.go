@@ -71,9 +71,9 @@ func VerDetalleCorredor() {
 		return
 	}
 
-	fmt.Println("-----------------------------------------------------------------------------------------------")
-	fmt.Println("| #  | Carrera | Pos Final | Vuelta rápida | Velocidad max | Menor tiempo vuelta |")
-	fmt.Println("-----------------------------------------------------------------------------------------------")
+	fmt.Println("-----------------------------------------------------------------------------------")
+	fmt.Println("| #  | Carrera | Pos Final | Vuelta rápida | Velocidad max | Menor tiempo vuelta  |")
+	fmt.Println("-----------------------------------------------------------------------------------")
 	for i, c := range detalle["race_results"].([]interface{}) {
 		carrera := c.(map[string]interface{})
 		fmt.Printf("| %-2d | %-7s | %-9.0f | %-13s | %-13.0f | %-20.3f |\n",
@@ -85,8 +85,19 @@ func VerDetalleCorredor() {
 			carrera["best_lap_duration"].(float64), // float64
 		)
 	}
-	fmt.Println("-----------------------------------------------------------------------------------------------")	
-	// FALTA LO DE EL RESUMEN QUE ESTÁ EN HANDLER PERO NO SE LLAMA A GETPERFORMANCESTATS !!!!
+	fmt.Println("-----------------------------------------------------------------------------------")	
+	
+	performance := detalle["performance_summary"].(map[string]interface{})
+
+	fmt.Println("-------------------------------------------------")
+	fmt.Println("| Resumen del desempeno del piloto              |")
+	fmt.Println("-------------------------------------------------")
+	fmt.Printf("| %-30s | %-12v |\n", "Carreras ganadas", int(performance["wins"].(float64)))
+	fmt.Printf("| %-30s | %-12v |\n", "Veces en el top 3", int(performance["top_3_finishes"].(float64)))
+	fmt.Printf("| %-30s | %-7.0f km/h |\n", "Velocidad maxima alcanzada", performance["max_speed"].(float64))
+	fmt.Println("-------------------------------------------------")
+
+
 }
 
 func formatearFecha(iso string) string {
@@ -207,39 +218,44 @@ func ResumenTemporada() {
 		log.Fatal("Error al deserializar resumen:", err)
 	}
 
-	fmt.Println("-------------------------------------------------------------")
-	fmt.Println("\n Top 3 Pilotos con más Victorias - Temporada 2024")
-	fmt.Println("-------------------------------------------------------------")
-	fmt.Printf("| %-8s | %-18s | %-13s | %-6s | %-10s |\n", "Posición", "Piloto", "Equipo", "País", "Victorias")
-	fmt.Println("-------------------------------------------------------------")
+	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Println(" Top 3 Pilotos con más Victorias - Temporada 2024")
+	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Printf("| %-9s | %-20s | %-20s | %-5s | %-10s |\n", "Posición", "Piloto", "Equipo", "País", "Victorias")
+	fmt.Println("--------------------------------------------------------------------------------")
 	for _, item := range resumen["top_3_winners"].([]interface{}) {
 		p := item.(map[string]interface{})
-		fmt.Printf("| %-8.0f | %-18s | %-13s | %-6s | %-10.0f |\n",
+		fmt.Printf("| %-9.0f | %-20s | %-20s | %-5s | %-10.0f |\n",
 			p["position"], p["driver"], p["team"], p["country"], p["wins"])
 	}
-	fmt.Println("-------------------------------------------------------------")
+	fmt.Println("--------------------------------------------------------------------------------")
 
-	fmt.Println("-------------------------------------------------------------")
-	fmt.Println("\n Top 3 Pilotos con más Vueltas Rápidas - Temporada 2024")
-	fmt.Println("-------------------------------------------------------------")
-	fmt.Printf("| %-8s | %-18s | %-13s | %-6s | %-16s |\n", "Posición", "Piloto", "Equipo", "País", "Vueltas Rápidas")
-	fmt.Println("-------------------------------------------------------------")
+	// Top 3 Pilotos con más Vueltas Rápidas
+	fmt.Println()
+	fmt.Println("-------------------------------------------------------------------------------------")
+	fmt.Println(" Top 3 Pilotos con más Vueltas Rápidas - Temporada 2024")
+	fmt.Println("-------------------------------------------------------------------------------------")
+	fmt.Printf("| %-9s | %-20s | %-20s | %-5s | %-15s |\n", "Posición", "Piloto", "Equipo", "País", "Vueltas Rápidas")
+	fmt.Println("-------------------------------------------------------------------------------------")
 	for _, item := range resumen["top_3_fastest_laps"].([]interface{}) {
 		p := item.(map[string]interface{})
-		fmt.Printf("| %-8.0f | %-18s | %-13s | %-6s | %-16.0f |\n",
+		fmt.Printf("| %-9.0f | %-20s | %-20s | %-5s | %-15.0f |\n",
 			p["position"], p["driver"], p["team"], p["country"], p["fastest_laps"])
 	}
-	fmt.Println("-------------------------------------------------------------")
+	fmt.Println("-------------------------------------------------------------------------------------")
 
-	fmt.Println("-------------------------------------------------------------")
-	fmt.Println("\n Top 3 Pilotos con más Pole Positions - Temporada 2024")
-	fmt.Println("-------------------------------------------------------------")
-	fmt.Printf("| %-8s | %-18s | %-13s | %-6s | %-10s |\n", "Posición", "Piloto", "Equipo", "País", "Poles")
-	fmt.Println("-------------------------------------------------------------")
+	// Top 3 Pilotos con más Pole Positions
+	fmt.Println()
+	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Println(" Top 3 Pilotos con más Pole Positions - Temporada 2024")
+	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Printf("| %-9s | %-20s | %-20s | %-5s | %-10s |\n", "Posición", "Piloto", "Equipo", "País", "Poles")
+	fmt.Println("--------------------------------------------------------------------------------")
 	for _, item := range resumen["top_3_pole_positions"].([]interface{}) {
 		p := item.(map[string]interface{})
-		fmt.Printf("| %-8.0f | %-18s | %-13s | %-6s | %-10.0f |\n",
+		fmt.Printf("| %-9.0f | %-20s | %-20s | %-5s | %-10.0f |\n",
 			p["position"], p["driver"], p["team"], p["country"], p["poles"])
 	}
-	fmt.Println("-------------------------------------------------------------")
+	fmt.Println("--------------------------------------------------------------------------------")
 }
+
