@@ -38,7 +38,7 @@ func VerCorredores() {
 		)
 	}
 	fmt.Println("---------------------------------------------------------------------------")
-	
+
 }
 
 func boolAfirmativo(v interface{}) string {
@@ -53,6 +53,7 @@ func VerDetalleCorredor() {
 	var numero int
 	fmt.Scanln(&numero)
 
+	// Realizar la solicitud HTTP para obtener detalles del corredor
 	resp, err := http.Get(fmt.Sprintf("http://localhost:8080/api/corredor/detalle/%d", numero))
 	if err != nil {
 		log.Fatal("Error al obtener detalles del corredor:", err)
@@ -65,39 +66,39 @@ func VerDetalleCorredor() {
 		log.Fatal("Error al deserializar respuesta:", err)
 	}
 
-	// Primero revisar si el corredor existe
+	// Verificar si el corredor existe
 	if detalle["driver_id"] == nil {
 		fmt.Println("El piloto no existe")
 		return
 	}
 
-	fmt.Println("-----------------------------------------------------------------------------------")
-	fmt.Println("| #  | Carrera | Pos Final | Vuelta rápida | Velocidad max | Menor tiempo vuelta  |")
-	fmt.Println("-----------------------------------------------------------------------------------")
+	// Imprimir los resultados de la carrera
+	fmt.Println("--------------------------------------------------------------------------------------------")
+	fmt.Println("| #   | Carrera            | Pos Final | Vuelta rápida | Velocidad max | Menor tiempo vuelta  |")
+	fmt.Println("--------------------------------------------------------------------------------------------")
 	for i, c := range detalle["race_results"].([]interface{}) {
 		carrera := c.(map[string]interface{})
-		fmt.Printf("| %-2d | %-7s | %-9.0f | %-13s | %-13.0f | %-20.3f |\n",
+		fmt.Printf("| %-3d | %-18s | %-9.0f | %-13s | %-13.0f | %-20.3f |\n",
 			i+1,
-			carrera["race"].(string),             // string
-			carrera["position"].(float64),         // float64
-			boolAfirmativo(carrera["fastest_lap"]), // string ("Sí"/"No")
-			carrera["max_speed"].(float64),         // float64
-			carrera["best_lap_duration"].(float64), // float64
+			carrera["race"].(string),               // Carrera (string)
+			carrera["position"].(float64),          // Posición final (float64)
+			boolAfirmativo(carrera["fastest_lap"]), // Vuelta rápida ("Sí"/"No")
+			carrera["max_speed"].(float64),         // Velocidad máxima (float64)
+			carrera["best_lap_duration"].(float64), // Menor tiempo vuelta (float64)
 		)
 	}
-	fmt.Println("-----------------------------------------------------------------------------------")	
-	
+	fmt.Println("--------------------------------------------------------------------------------------------")
+
+	// Imprimir el resumen del desempeño del piloto
 	performance := detalle["performance_summary"].(map[string]interface{})
 
 	fmt.Println("-------------------------------------------------")
-	fmt.Println("| Resumen del desempeno del piloto              |")
+	fmt.Println("| Resumen del desempeño del piloto               |")
 	fmt.Println("-------------------------------------------------")
 	fmt.Printf("| %-30s | %-12v |\n", "Carreras ganadas", int(performance["wins"].(float64)))
 	fmt.Printf("| %-30s | %-12v |\n", "Veces en el top 3", int(performance["top_3_finishes"].(float64)))
-	fmt.Printf("| %-30s | %-7.0f km/h |\n", "Velocidad maxima alcanzada", performance["max_speed"].(float64))
+	fmt.Printf("| %-30s | %-7.0f km/h |\n", "Velocidad máxima alcanzada", performance["max_speed"].(float64))
 	fmt.Println("-------------------------------------------------")
-
-
 }
 
 func formatearFecha(iso string) string {
@@ -125,7 +126,7 @@ func VerCarreras() {
 	fmt.Println("-----------------------------------------------------------------------------------------")
 	fmt.Println("| #  | ID carrera | País           | Fecha       | Año  | Circuito           |")
 	fmt.Println("-----------------------------------------------------------------------------------------")
-	
+
 	for i, c := range carreras {
 		fecha := formatearFecha(c["date_start"].(string))
 		fmt.Printf("| %-2d | %-10v | %-14v | %-10s | %-4v | %-18v |\n",
@@ -138,7 +139,6 @@ func VerCarreras() {
 		)
 	}
 	fmt.Println("-----------------------------------------------------------------------------------------")
-	
 
 }
 
@@ -258,4 +258,3 @@ func ResumenTemporada() {
 	}
 	fmt.Println("--------------------------------------------------------------------------------")
 }
-
