@@ -245,7 +245,7 @@ WITH FinalRacePositions AS (
 SELECT 
     frp.session_key,
     s.circuit_short_name,
-    s.session_name,
+    'GP de ' || s.circuit_short_name as session_name,  -- Único cambio realizado
     frp.position as final_position,
     (
         SELECT CAST(l.lap_duration AS REAL)
@@ -274,7 +274,7 @@ SELECT
     ) as had_fastest_lap
 FROM FinalRacePositions frp
 JOIN session s ON frp.session_key = s.session_key
-WHERE frp.pos_rank = 1  -- Solo la última posición registrada en cada carrera
+WHERE frp.pos_rank = 1
 ORDER BY frp.session_key DESC;`
 
 	rows, err := db.Query(query, driverID)
