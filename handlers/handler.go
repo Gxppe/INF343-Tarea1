@@ -434,27 +434,32 @@ func GetRaceDetails(db *sql.DB, raceID int) (map[string]interface{}, error) {
 	}
 
 	// 3. Obtener último puesto
-	lastQuery := `SELECT 
-    p.position, 
-    d.first_name || ' ' || d.last_name AS driver_name,
-    d.team_name,
-    d.country_code
-FROM position p
-JOIN driver d ON p.driver_number = d.driver_number
-WHERE p.session_key = ?
-  AND p.position = (
-      SELECT MAX(position) 
-      FROM position 
-      WHERE session_key = ?
-  );
-`
+	lastQuery := `WITH LastPlace AS (
+    SELECT 
+        p.driver_number,
+        d.first_name || ' ' || d.last_name as driver_name,
+        d.team_name,
+        d.country_code,
+        ROW_NUMBER() OVER (ORDER BY p.position DESC, p.date DESC) as rank
+    FROM position p
+    JOIN driver d ON p.driver_number = d.driver_number
+    WHERE p.session_key = ?  -- ID de carrera como parámetro
+    AND p.position IS NOT NULL
+)
+SELECT 
+    'Último' as position,
+    driver_name as driver,
+    team_name as team,
+    country_code as country
+FROM LastPlace
+WHERE rank = 1;`
 	var (
-		lastPos     int
+		lastPos     string
 		lastDriver  string
 		lastTeam    string
 		lastCountry string
 	)
-	err = db.QueryRow(lastQuery, raceID, raceID).Scan(
+	err = db.QueryRow(lastQuery, raceID).Scan(
 		&lastPos, &lastDriver, &lastTeam, &lastCountry,
 	)
 	if err != nil {
